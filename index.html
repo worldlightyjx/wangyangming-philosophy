@@ -34,6 +34,10 @@
     overflow: hidden;
   }
 
+  body.drawer-open {
+    overflow: hidden;
+  }
+
   #sidebar {
     width: 320px;
     flex-shrink: 0;
@@ -42,6 +46,12 @@
     background: var(--panel);
     color: #f4ead8;
     border-right: 1px solid #30271d;
+    transition: transform .25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  #sidebarBackdrop,
+  #sidebarToggle {
+    display: none;
   }
 
   #sidebarHeader {
@@ -144,6 +154,11 @@
     backdrop-filter: blur(6px);
   }
 
+  #modeSwitches {
+    display: flex;
+    gap: 8px;
+  }
+
   #currentTitle {
     flex: 1;
     min-width: 0;
@@ -170,6 +185,7 @@
     color: #7d5e22;
     cursor: pointer;
     font: inherit;
+    min-height: 40px;
   }
 
   .modeBtn.active {
@@ -267,14 +283,164 @@
   }
 
   @media (max-width: 900px) {
-    #sidebar { width: 280px; }
-    #toolbar { padding: 12px 14px; flex-wrap: wrap; }
-    #content { padding: 18px 14px 40px; }
+    html, body {
+      height: 100%;
+    }
+
+    #sidebarBackdrop {
+      position: fixed;
+      inset: 0;
+      display: block;
+      background: rgba(17, 16, 14, 0.5);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s ease;
+      z-index: 19;
+    }
+
+    body.drawer-open #sidebarBackdrop {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: min(86vw, 320px);
+      max-width: 320px;
+      z-index: 20;
+      transform: translateX(-100%);
+      box-shadow: 18px 0 40px rgba(0, 0, 0, 0.28);
+    }
+
+    body.drawer-open #sidebar {
+      transform: translateX(0);
+    }
+
+    #sidebarToggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 12px;
+      border: 1px solid var(--gold);
+      border-radius: 8px;
+      background: rgba(246, 240, 231, .96);
+      color: #7d5e22;
+      font: inherit;
+      font-size: .95rem;
+      cursor: pointer;
+    }
+
+    #main {
+      min-height: 100dvh;
+    }
+
+    #toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      padding: 12px 14px;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    #currentTitle {
+      min-width: 0;
+      flex: 1 1 calc(100% - 56px);
+    }
+
+    #currentTitle h2 {
+      font-size: 1rem;
+    }
+
+    #currentMeta {
+      font-size: .76rem;
+      line-height: 1.5;
+    }
+
+    #modeSwitches {
+      width: 100%;
+    }
+
+    .modeBtn {
+      flex: 1 1 0;
+      padding: 8px 10px;
+    }
+
+    #content {
+      padding: 18px 14px 40px;
+    }
+
+    .notice {
+      margin-bottom: 18px;
+      padding: 14px;
+      line-height: 1.8;
+    }
+
+    .block {
+      margin-bottom: 14px;
+      border-radius: 7px;
+    }
+
+    .wen, .bai {
+      padding: 13px 14px;
+      line-height: 1.9;
+    }
+
+    .label {
+      font-size: .68rem;
+      letter-spacing: .12em;
+    }
+  }
+
+  @media (max-width: 560px) {
+    #content {
+      padding: 14px 10px 28px;
+    }
+
+    #contentInner {
+      max-width: none;
+    }
+
+    #sidebarHeader {
+      padding: 18px 16px 12px;
+    }
+
+    #searchWrap {
+      padding: 10px 14px;
+    }
+
+    #searchInput {
+      padding: 11px 10px;
+    }
+
+    .navGroupTitle {
+      padding: 10px 14px 6px;
+    }
+
+    .navItem {
+      padding: 10px 14px 10px 16px;
+      font-size: .9rem;
+    }
+
+    .navItem small {
+      margin-top: 3px;
+      line-height: 1.5;
+    }
+
+    .wen, .bai {
+      padding: 12px 12px 13px;
+      font-size: .95rem;
+    }
   }
 </style>
 <script src="data/book-index.js"></script>
 </head>
 <body class="mode-wen">
+<div id="sidebarBackdrop" hidden></div>
 <aside id="sidebar">
   <div id="sidebarHeader">
     <h1>王阳明全集</h1>
@@ -288,13 +454,16 @@
 
 <main id="main">
   <div id="toolbar">
+    <button id="sidebarToggle" type="button" aria-expanded="false" aria-controls="sidebar">目录</button>
     <div id="currentTitle">
       <h2 id="titleText">载入中…</h2>
       <div id="currentMeta"></div>
     </div>
-    <button class="modeBtn active" data-mode="wen">文言</button>
-    <button class="modeBtn" data-mode="bai">白话</button>
-    <button class="modeBtn" data-mode="both">对照</button>
+    <div id="modeSwitches">
+      <button class="modeBtn active" data-mode="wen">文言</button>
+      <button class="modeBtn" data-mode="bai">白话</button>
+      <button class="modeBtn" data-mode="both">对照</button>
+    </div>
   </div>
 
   <div id="content">
@@ -311,8 +480,32 @@
   const titleText = document.getElementById('titleText');
   const currentMeta = document.getElementById('currentMeta');
   const searchInput = document.getElementById('searchInput');
+  const sidebarToggle = document.getElementById('sidebarToggle');
+  const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+  const mobileMedia = window.matchMedia('(max-width: 900px)');
 
   let currentVolumeId = BOOK_INDEX.volumes[0]?.id || null;
+
+  function closeSidebar() {
+    document.body.classList.remove('drawer-open');
+    sidebarToggle.setAttribute('aria-expanded', 'false');
+    sidebarBackdrop.hidden = true;
+  }
+
+  function openSidebar() {
+    if (!mobileMedia.matches) return;
+    document.body.classList.add('drawer-open');
+    sidebarToggle.setAttribute('aria-expanded', 'true');
+    sidebarBackdrop.hidden = false;
+  }
+
+  function toggleSidebar() {
+    if (document.body.classList.contains('drawer-open')) {
+      closeSidebar();
+      return;
+    }
+    openSidebar();
+  }
 
   function escapeHtml(str) {
     return str
@@ -360,6 +553,7 @@
         btn.innerHTML = `${escapeHtml(volume.title)}<small>页 ${volume.start_page} - ${volume.end_page} · ${volume.block_count} 段</small>`;
         btn.addEventListener('click', () => {
           searchInput.value = '';
+          closeSidebar();
           loadAndRenderVolume(volume.id);
         });
         group.appendChild(btn);
@@ -504,6 +698,15 @@
       `).join('')}
     `;
   }
+
+  sidebarToggle.addEventListener('click', toggleSidebar);
+  sidebarBackdrop.addEventListener('click', closeSidebar);
+  mobileMedia.addEventListener('change', (event) => {
+    if (!event.matches) closeSidebar();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeSidebar();
+  });
 
   document.querySelectorAll('.modeBtn').forEach((btn) => {
     btn.addEventListener('click', () => {
