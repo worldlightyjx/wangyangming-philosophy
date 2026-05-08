@@ -25,16 +25,18 @@
 
 ## 当前入口
 
-- 网页入口：`王阳明全集-文白对照.html`
+- 主入口：`index.html`
+- 兼容入口：`王阳明全集-文白对照.html`（会自动跳转到 `index.html`）
 
-直接用浏览器打开即可本地阅读。
+本地双击 `index.html` 即可阅读；部署到 GitHub Pages 时也会默认使用这个入口。
 
 ## 目录结构
 
 ```text
 .
 ├── README.md
-├── 王阳明全集-文白对照.html      # 交互式网页入口
+├── index.html                    # GitHub Pages / 本地主入口
+├── 王阳明全集-文白对照.html      # 兼容旧链接的跳转页
 ├── 王阳明全集.pdf                # 当前使用的 PDF 文件
 ├── data/
 │   ├── book-index.js            # 全书卷索引
@@ -83,7 +85,29 @@ window.BOOK_VOLUMES["juan01-cxl-shang"] = {
 直接双击或在浏览器中打开：
 
 ```text
+index.html
+```
+
+如果仍从旧文件名打开：
+
+```text
 王阳明全集-文白对照.html
+```
+
+页面也会自动跳转到 `index.html`。
+
+### 1.1 GitHub Pages 部署
+
+如果仓库地址是：
+
+```text
+https://github.com/worldlightyjx/wangyangming-philosophy
+```
+
+那么启用仓库 Pages 后，默认访问地址会是：
+
+```text
+https://worldlightyjx.github.io/wangyangming-philosophy/
 ```
 
 ### 2. 页面功能
