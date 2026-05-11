@@ -500,14 +500,24 @@
 
   const navEl = document.getElementById('nav');
   const contentInner = document.getElementById('contentInner');
+  const contentEl = document.getElementById('content');
   const titleText = document.getElementById('titleText');
   const currentMeta = document.getElementById('currentMeta');
   const searchInput = document.getElementById('searchInput');
   const sidebarToggle = document.getElementById('sidebarToggle');
   const sidebarBackdrop = document.getElementById('sidebarBackdrop');
   const mobileMedia = window.matchMedia('(max-width: 900px)');
+  const volumeIdOrder = BOOK_INDEX.volumes.map((volume) => volume.id);
+  const volumeMetaById = new Map(BOOK_INDEX.volumes.map((volume, index) => [volume.id, { volume, index }]));
+  const baihuaIdSet = new Set(BOOK_INDEX.baihua_ids || ['juan01-cxl-shang', 'juan02-cxl-zhong', 'juan03-cxl-xia']);
+  const scriptLoaders = new Map();
+  const requestIdle = window.requestIdleCallback
+    ? (callback) => window.requestIdleCallback(callback, { timeout: 1200 })
+    : (callback) => window.setTimeout(callback, 250);
 
   let currentVolumeId = BOOK_INDEX.volumes[0]?.id || null;
+  let allVolumesReadyPromise = null;
+  let renderSequence = 0;
 
   function closeSidebar() {
     document.body.classList.remove('drawer-open');
@@ -593,16 +603,31 @@
   }
 
   function loadScript(src, optional = false) {
-    return new Promise((resolve, reject) => {
+    if (scriptLoaders.has(src)) return scriptLoaders.get(src);
+
+    const loader = new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = src;
-      script.onload = resolve;
-      script.onerror = optional ? resolve : reject;
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => {
+        script.remove();
+        if (optional) {
+          resolve(false);
+          return;
+        }
+        scriptLoaders.delete(src);
+        reject(new Error(`Failed to load script: ${src}`));
+      };
       document.head.appendChild(script);
     });
+
+    scriptLoaders.set(src, loader);
+    return loader;
   }
 
   async function loadBaihua(id) {
+    if (!baihuaIdSet.has(id)) return null;
     if (window.BOOK_BAIHUA[id]) return window.BOOK_BAIHUA[id];
     await loadScript(`data/baihua/${id}.js`, true);
     return window.BOOK_BAIHUA[id] || null;
@@ -628,10 +653,43 @@
   }
 
   async function ensureAllVolumes() {
-    for (const volume of BOOK_INDEX.volumes) {
-      await loadVolume(volume.id);
-      await loadBaihua(volume.id);
+    if (!allVolumesReadyPromise) {
+      const volumeLoads = BOOK_INDEX.volumes.map((volume) => loadVolume(volume.id));
+      const baihuaLoads = [...baihuaIdSet].map((id) => loadBaihua(id));
+      allVolumesReadyPromise = Promise.all([...volumeLoads, ...baihuaLoads]);
     }
+    await allVolumesReadyPromise;
+  }
+
+  function prefetchVolume(id) {
+    if (!id) return;
+    loadVolume(id).catch(() => {});
+    loadBaihua(id).catch(() => {});
+  }
+
+  function prefetchAdjacentVolumes(id) {
+    const meta = volumeMetaById.get(id);
+    if (!meta) return;
+
+    const neighbors = [
+      volumeIdOrder[meta.index + 1],
+      volumeIdOrder[meta.index - 1],
+      volumeIdOrder[meta.index + 2],
+    ].filter(Boolean);
+
+    requestIdle(() => {
+      neighbors.forEach((neighborId) => prefetchVolume(neighborId));
+    });
+  }
+
+  function renderVolumeShell(volume) {
+    titleText.textContent = volume.title;
+    currentMeta.textContent = `第 ${volume.start_page} - ${volume.end_page} 页 · ${volume.block_count} 段`;
+    contentInner.innerHTML = `
+      <div class="notice">
+        正在加载 ${escapeHtml(volume.title)}……
+      </div>
+    `;
   }
 
   function renderBlocks(blocks, query = '') {
@@ -656,11 +714,21 @@
   }
 
   async function loadAndRenderVolume(id) {
-    const rawVolume = await loadVolume(id);
-    await loadBaihua(id);
-    const volume = withBaihua(rawVolume);
+    const meta = volumeMetaById.get(id)?.volume;
+    const sequence = ++renderSequence;
+
     currentVolumeId = id;
     setActiveNav(id);
+    if (meta) renderVolumeShell(meta);
+
+    const [rawVolume] = await Promise.all([
+      loadVolume(id),
+      loadBaihua(id),
+    ]);
+
+    if (sequence !== renderSequence) return;
+
+    const volume = withBaihua(rawVolume);
     titleText.textContent = volume.title;
     currentMeta.textContent = `第 ${volume.start_page} - ${volume.end_page} 页 · ${volume.block_count} 段`;
     contentInner.innerHTML = `
@@ -670,7 +738,8 @@
       </div>
       ${renderBlocks(volume.blocks)}
     `;
-    document.getElementById('content').scrollTo({ top: 0, behavior: 'smooth' });
+    contentEl.scrollTo({ top: 0, behavior: 'smooth' });
+    prefetchAdjacentVolumes(id);
   }
 
   async function searchAll(query) {

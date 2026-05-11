@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PDF_PATH = ROOT / "王阳明全集（隆庆初刻本增补全本，简体横排） (【明朝】王阳明) (z-library.sk, 1lib.sk, z-lib.sk).pdf"
 DATA_DIR = ROOT / "data"
 VOLUME_DIR = DATA_DIR / "volumes"
+BAIHUA_DIR = DATA_DIR / "baihua"
 
 
 VOLUMES = [
@@ -153,6 +154,7 @@ def main() -> None:
     index = {
         "title": "王阳明全集",
         "total_pages": 3750,
+        "baihua_ids": sorted(path.stem for path in BAIHUA_DIR.glob("*.js")) if BAIHUA_DIR.exists() else [],
         "volumes": [],
     }
 
